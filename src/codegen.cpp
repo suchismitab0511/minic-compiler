@@ -1,5 +1,6 @@
 #include "codegen.h"
 #include "lexer.h"   // for error()
+static int labelCount = 0;   // gives each if/while unique labels
 
 static void genExpr(const Node* n, std::ostream& out) {
     switch (n->kind) {
@@ -63,14 +64,44 @@ static void genStmt(const Node* n, std::ostream& out) {
         genExpr(n->lhs.get(), out);
         out << "  jmp .L.return\n";
         return;
+
     case NodeKind::ExprStmt:
-        genExpr(n->lhs.get(), out);   // result is ignored
+        genExpr(n->lhs.get(), out);
         return;
+
     case NodeKind::Block:
         for (const auto& s : n->body) {
             genStmt(s.get(), out);
         }
         return;
+
+    case NodeKind::If: {
+        int id = labelCount++;   // take the number BEFORE generating children
+        genExpr(n->cond.get(), out);
+        out << "  cmp rax, 0\n";
+        out << "  je .L.else." << id << "\n";
+        genStmt(n->then.get(), out);
+        out << "  jmp .L.end." << id << "\n";
+        out << ".L.else." << id << ":\n";
+        if (n->els) {
+            genStmt(n->els.get(), out);
+        }
+        out << ".L.end." << id << ":\n";
+        return;
+    }
+
+    case NodeKind::While: {
+        int id = labelCount++;
+        out << ".L.begin." << id << ":\n";
+        genExpr(n->cond.get(), out);
+        out << "  cmp rax, 0\n";
+        out << "  je .L.end." << id << "\n";
+        genStmt(n->then.get(), out);
+        out << "  jmp .L.begin." << id << "\n";
+        out << ".L.end." << id << ":\n";
+        return;
+    }
+
     default:
         error(0, "codegen: unknown statement");
     }

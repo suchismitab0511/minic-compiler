@@ -49,5 +49,24 @@ assert 2 "int foo = 1; int bar = foo + 1; return bar;"
 assert 5 "{ int a = 5; return a; }"
 assert 0 "int a = 7;"
 assert 1 "return 1; return 2;"
+# if / else
+assert 3 "if (0) return 2; return 3;"
+assert 3 "if (1-1) return 2; return 3;"
+assert 2 "if (1) return 2; return 3;"
+assert 2 "if (2-1) return 2; return 3;"
+assert 4 "if (0) return 3; else return 4;"
+assert 3 "int x = 5; if (x > 3) return 3; else return 4;"
+assert 2 "int x = 0; if (1) if (0) x = 1; else x = 2; return x;"
+
+# while
+assert 10 "int i = 0; while (i < 10) i = i + 1; return i;"
+assert 0 "while (0) return 1; return 0;"
+assert 55 "int i = 0; int sum = 0; while (i <= 10) { sum = sum + i; i = i + 1; } return sum;"
+assert 120 "int n = 5; int f = 1; while (n > 1) { f = f * n; n = n - 1; } return f;"
+
+# nested loops and real algorithms
+assert 6 "int i = 0; int c = 0; while (i < 3) { int j = 0; while (j < 2) { c = c + 1; j = j + 1; } i = i + 1; } return c;"
+assert 89 "int a = 0; int b = 1; int i = 0; while (i < 10) { int t = a + b; a = b; b = t; i = i + 1; } return b;"
+assert 6 "int a = 48; int b = 18; while (b != 0) { int t = b; b = a - a / b * b; a = t; } return a;"
 
 echo "ALL TESTS PASSED"

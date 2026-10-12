@@ -50,6 +50,28 @@ std::unique_ptr<Node> Parser::stmt() {
         expect(";");
         return node;
     }
+        // "if" "(" expr ")" stmt ("else" stmt)?
+    if (match("if")) {
+        auto node = makeNode(NodeKind::If);
+        expect("(");
+        node->cond = expr();
+        expect(")");
+        node->then = stmt();
+        if (match("else")) {
+            node->els = stmt();
+        }
+        return node;
+    }
+
+    // "while" "(" expr ")" stmt
+    if (match("while")) {
+        auto node = makeNode(NodeKind::While);
+        expect("(");
+        node->cond = expr();
+        expect(")");
+        node->then = stmt();   // loop body
+        return node;
+    }
 
     // "int" ident ("=" expr)? ";"
     if (match("int")) {

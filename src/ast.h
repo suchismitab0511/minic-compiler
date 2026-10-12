@@ -11,7 +11,7 @@ enum class NodeKind {
     Eq, Ne, Lt, Le,
     Assign,
     // statements
-    Return, ExprStmt, Block
+    Return, ExprStmt, Block, If, While
 };
 
 struct Node {
@@ -21,6 +21,9 @@ struct Node {
     int offset = 0;                             // Var: lives at [rbp - offset]
     std::unique_ptr<Node> lhs;                  // left child / only child
     std::unique_ptr<Node> rhs;                  // right child
+    std::unique_ptr<Node> cond;                 // If / While: the condition
+    std::unique_ptr<Node> then;                 // If: then-branch.  While: loop body
+    std::unique_ptr<Node> els;                  // If: else-branch (may be empty)
     std::vector<std::unique_ptr<Node>> body;    // Block: list of statements
 };
 
@@ -82,6 +85,8 @@ inline std::string nodeLabel(const Node* n) {
         case NodeKind::Return:   return "Return";
         case NodeKind::ExprStmt: return "ExprStmt";
         case NodeKind::Block:    return "Block";
+        case NodeKind::If:       return "If";
+        case NodeKind::While:    return "While";
     }
     return "?";
 }

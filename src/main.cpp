@@ -15,9 +15,12 @@ static std::string kindName(TokenKind k) {
     return "?";
 }
 
-static void printAst(const Node* n, int depth = 0) {
+static void printAst(const Node* n, int depth = 0, const std::string& tag = "") {
     if (!n) return;
-    std::cout << std::string(depth * 2, ' ') << nodeLabel(n) << "\n";
+    std::cout << std::string(depth * 2, ' ') << tag << nodeLabel(n) << "\n";
+    printAst(n->cond.get(), depth + 1, "cond: ");
+    printAst(n->then.get(), depth + 1, n->kind == NodeKind::While ? "body: " : "then: ");
+    printAst(n->els.get(), depth + 1, "else: ");
     printAst(n->lhs.get(), depth + 1);
     printAst(n->rhs.get(), depth + 1);
     for (const auto& s : n->body) {
