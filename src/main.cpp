@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 #include "lexer.h"
+#include "parser.h"
+#include "codegen.h"
 
 static std::string kindName(TokenKind k) {
     switch (k) {
@@ -13,34 +15,38 @@ static std::string kindName(TokenKind k) {
     return "?";
 }
 
+static void printAst(const Node* n, int depth = 0) {
+    if (!n) return;
+    std::cout << std::string(depth * 2, ' ') << nodeLabel(n) << "\n";
+    printAst(n->lhs.get(), depth + 1);
+    printAst(n->rhs.get(), depth + 1);
+}
+
 int main(int argc, char** argv) {
-    // Debug mode: ./minic --tokens "code"
-    if (argc == 3 && std::string(argv[1]) == "--tokens") {
-        for (const Token& t : tokenize(argv[2])) {
-            std::cout << "line " << t.line << "  "
-                      << kindName(t.kind) << "  '" << t.text << "'\n";
+    if (argc == 3) {
+        std::string mode = argv[1];
+        if (mode == "--tokens") {
+            for (const Token& t : tokenize(argv[2])) {
+                std::cout << "line " << t.line << "  "
+                          << kindName(t.kind) << "  '" << t.text << "'\n";
+            }
+            return 0;
         }
-        return 0;
+        if (mode == "--ast") {
+            Parser parser(tokenize(argv[2]));
+            auto root = parser.parseProgram();
+            printAst(root.get());
+            return 0;
+        }
     }
 
     if (argc != 2) {
-        std::cerr << "usage: minic <code>  or  minic --tokens <code>\n";
+        std::cerr << "usage: minic <code> | minic --tokens <code> | minic --ast <code>\n";
         return 1;
     }
 
-    std::vector<Token> tokens = tokenize(argv[1]);
-
-    // Temporary: still only a single number is supported.
-    // The parser in Step 3 replaces this.
-    if (tokens[0].kind != TokenKind::Number) {
-        error(tokens[0].line, "expected a number");
-    }
-
-    std::cout << ".intel_syntax noprefix\n";
-    std::cout << ".globl main\n";
-    std::cout << "main:\n";
-    std::cout << "  mov rax, " << tokens[0].value << "\n";
-    std::cout << "  ret\n";
-    std::cout << ".section .note.GNU-stack,\"\",@progbits\n";
+    Parser parser(tokenize(argv[1]));
+    auto root = parser.parseProgram();
+    generate(root.get(), std::cout);
     return 0;
 }
