@@ -20,6 +20,9 @@ static void printAst(const Node* n, int depth = 0) {
     std::cout << std::string(depth * 2, ' ') << nodeLabel(n) << "\n";
     printAst(n->lhs.get(), depth + 1);
     printAst(n->rhs.get(), depth + 1);
+    for (const auto& s : n->body) {
+        printAst(s.get(), depth + 1);
+    }
 }
 
 int main(int argc, char** argv) {
@@ -34,8 +37,8 @@ int main(int argc, char** argv) {
         }
         if (mode == "--ast") {
             Parser parser(tokenize(argv[2]));
-            auto root = parser.parseProgram();
-            printAst(root.get());
+            Program prog = parser.parseProgram();
+            printAst(prog.body.get());
             return 0;
         }
     }
@@ -46,7 +49,7 @@ int main(int argc, char** argv) {
     }
 
     Parser parser(tokenize(argv[1]));
-    auto root = parser.parseProgram();
-    generate(root.get(), std::cout);
+    Program prog = parser.parseProgram();
+    generate(prog, std::cout);
     return 0;
 }

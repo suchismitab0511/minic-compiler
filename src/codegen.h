@@ -2,4 +2,4 @@
 #include <ostream>
 #include "ast.h"
 
-void generate(const Node* root, std::ostream& out);
+void generate(const Program& prog, std::ostream& out);

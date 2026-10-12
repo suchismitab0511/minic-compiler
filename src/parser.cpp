@@ -20,21 +20,101 @@ void Parser::expect(const std::string& text) {
     }
 }
 
+std::string Parser::expectIdent() {
+    if (peek().kind != TokenKind::Ident) {
+        error(peek().line, "expected a variable name");
+    }
+    return toks[pos++].text;
+}
+
 // ---------- entry point ----------
 
-std::unique_ptr<Node> Parser::parseProgram() {
-    auto node = expr();
-    if (peek().kind != TokenKind::End) {
-        error(peek().line, "unexpected '" + peek().text + "'");
+// program = stmt*
+Program Parser::parseProgram() {
+    auto block = makeNode(NodeKind::Block);
+    while (peek().kind != TokenKind::End) {
+        block->body.push_back(stmt());
     }
+    Program prog;
+    prog.body = std::move(block);
+    prog.stackSize = stackSize;
+    return prog;
+}
+
+// ---------- statements ----------
+
+std::unique_ptr<Node> Parser::stmt() {
+    // "return" expr ";"
+    if (match("return")) {
+        auto node = makeUnary(NodeKind::Return, expr());
+        expect(";");
+        return node;
+    }
+
+    // "int" ident ("=" expr)? ";"
+    if (match("int")) {
+        return declaration();
+    }
+
+    // "{" stmt* "}"
+    if (match("{")) {
+        auto block = makeNode(NodeKind::Block);
+        while (!match("}")) {
+            if (peek().kind == TokenKind::End) {
+                error(peek().line, "expected '}' but found end of input");
+            }
+            block->body.push_back(stmt());
+        }
+        return block;
+    }
+
+    // expr ";"
+    auto node = makeUnary(NodeKind::ExprStmt, expr());
+    expect(";");
     return node;
 }
 
-// ---------- grammar rules (lowest to highest precedence) ----------
+// Called after "int" has been read.
+std::unique_ptr<Node> Parser::declaration() {
+    int line = peek().line;
+    std::string name = expectIdent();
 
-// expr = equality
+    if (locals.count(name)) {
+        error(line, "variable '" + name + "' is already declared");
+    }
+    stackSize += 8;
+    locals[name] = stackSize;          // first var: 8, second: 16, ...
+
+    if (match("=")) {
+        auto var = makeVar(name, locals[name]);
+        auto value = expr();
+        expect(";");
+        return makeUnary(NodeKind::ExprStmt,
+                         makeBinary(NodeKind::Assign, std::move(var), std::move(value)));
+    }
+
+    expect(";");
+    return makeNode(NodeKind::Block);   // "int x;" alone generates no code
+}
+
+// ---------- expressions (lowest to highest precedence) ----------
+
+// expr = assign
 std::unique_ptr<Node> Parser::expr() {
-    return equality();
+    return assign();
+}
+
+// assign = equality ("=" assign)?
+std::unique_ptr<Node> Parser::assign() {
+    auto node = equality();
+    if (match("=")) {
+        if (node->kind != NodeKind::Var) {
+            error(peek().line, "left side of '=' must be a variable");
+        }
+        auto rhs = assign();           // calls itself: right-associative
+        node = makeBinary(NodeKind::Assign, std::move(node), std::move(rhs));
+    }
+    return node;
 }
 
 // equality = relational ( ("==" | "!=") relational )*
@@ -111,14 +191,14 @@ std::unique_ptr<Node> Parser::mul() {
 std::unique_ptr<Node> Parser::unary() {
     if (match("-")) return makeUnary(NodeKind::Neg, unary());
     if (match("!")) return makeUnary(NodeKind::Not, unary());
-    if (match("+")) return unary();      // +x is just x
+    if (match("+")) return unary();
     return primary();
 }
 
-// primary = number | "(" expr ")"
+// primary = number | ident | "(" expr ")"
 std::unique_ptr<Node> Parser::primary() {
     if (match("(")) {
-        auto node = expr();               // brackets restart from the lowest level
+        auto node = expr();
         expect(")");
         return node;
     }
@@ -127,5 +207,14 @@ std::unique_ptr<Node> Parser::primary() {
         pos++;
         return makeNum(v);
     }
-    error(peek().line, "expected a number or '('");
+    if (peek().kind == TokenKind::Ident) {
+        const Token& t = peek();
+        auto it = locals.find(t.text);
+        if (it == locals.end()) {
+            error(t.line, "undeclared variable '" + t.text + "'");
+        }
+        pos++;
+        return makeVar(t.text, it->second);
+    }
+    error(peek().line, "expected a number, variable or '('");
 }
