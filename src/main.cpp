@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "codegen.h"
+#include "optimizer.h"
 
 static std::string kindName(TokenKind k) {
     switch (k) {
@@ -29,30 +30,48 @@ static void printAst(const Node* n, int depth = 0, const std::string& tag = "") 
 }
 
 int main(int argc, char** argv) {
-    if (argc == 3) {
-        std::string mode = argv[1];
-        if (mode == "--tokens") {
-            for (const Token& t : tokenize(argv[2])) {
-                std::cout << "line " << t.line << "  "
-                          << kindName(t.kind) << "  '" << t.text << "'\n";
-            }
-            return 0;
-        }
-        if (mode == "--ast") {
-            Parser parser(tokenize(argv[2]));
-            Program prog = parser.parseProgram();
-            printAst(prog.body.get());
-            return 0;
-        }
-    }
-
-    if (argc != 2) {
-        std::cerr << "usage: minic <code> | minic --tokens <code> | minic --ast <code>\n";
+    std::string mode, code;
+    if (argc == 2) {
+        code = argv[1];
+    } else if (argc == 3) {
+        mode = argv[1];
+        code = argv[2];
+    } else {
+        std::cerr << "usage: minic [--tokens | --ast | --ast-opt | --no-opt] <code>\n";
         return 1;
     }
 
-    Parser parser(tokenize(argv[1]));
+    if (!mode.empty() && mode != "--tokens" && mode != "--ast" &&
+        mode != "--ast-opt" && mode != "--no-opt") {
+        std::cerr << "unknown option: " << mode << "\n";
+        return 1;
+    }
+
+    if (mode == "--tokens") {
+        for (const Token& t : tokenize(code)) {
+            std::cout << "line " << t.line << "  "
+                      << kindName(t.kind) << "  '" << t.text << "'\n";
+        }
+        return 0;
+    }
+
+    Parser parser(tokenize(code));
     Program prog = parser.parseProgram();
+
+    if (mode == "--ast") {              // tree before optimization
+        printAst(prog.body.get());
+        return 0;
+    }
+
+    if (mode != "--no-opt") {
+        prog.body = optimize(std::move(prog.body));
+    }
+
+    if (mode == "--ast-opt") {          // tree after optimization
+        printAst(prog.body.get());
+        return 0;
+    }
+
     generate(prog, std::cout);
     return 0;
 }

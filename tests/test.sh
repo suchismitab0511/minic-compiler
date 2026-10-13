@@ -4,17 +4,18 @@ assert() {
     expected="$1"
     input="$2"
 
-    ./build/minic "$input" > tmp.s || exit 1
-    gcc tmp.s -o tmp
-    ./tmp
-    actual="$?"
+    for flag in "" "--no-opt"; do
+        ./build/minic $flag "$input" > tmp.s || exit 1
+        gcc tmp.s -o tmp
+        ./tmp
+        actual="$?"
 
-    if [ "$actual" = "$expected" ]; then
-        echo "PASS: $input => $actual"
-    else
-        echo "FAIL: $input => expected $expected, got $actual"
-        exit 1
-    fi
+        if [ "$actual" != "$expected" ]; then
+            echo "FAIL ($flag): $input => expected $expected, got $actual"
+            exit 1
+        fi
+    done
+    echo "PASS: $input => $expected"
 }
 
 # expressions (from Step 3, now as statements)
@@ -68,5 +69,13 @@ assert 120 "int n = 5; int f = 1; while (n > 1) { f = f * n; n = n - 1; } return
 assert 6 "int i = 0; int c = 0; while (i < 3) { int j = 0; while (j < 2) { c = c + 1; j = j + 1; } i = i + 1; } return c;"
 assert 89 "int a = 0; int b = 1; int i = 0; while (i < 10) { int t = a + b; a = b; b = t; i = i + 1; } return b;"
 assert 6 "int a = 48; int b = 18; while (b != 0) { int t = b; b = a - a / b * b; a = t; } return a;"
+
+# optimizer
+assert 10 "int x = 2 * 3 + 4; return x;"
+assert 7 "if (1) return 7; return 9;"
+assert 9 "if (2 > 3) return 1; return 9;"
+assert 9 "while (0) { return 1; } return 9;"
+assert 0 "int x = 0; if (0) x = 1 / 0; return x;"
+assert 1 "return 2000000000 + 2000000000 > 0;"
 
 echo "ALL TESTS PASSED"
